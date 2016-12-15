@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using Newtonsoft.Json;
@@ -40,7 +41,7 @@ namespace PdnColorize
         public override void Render(EffectConfigToken parameters, RenderArgs dstArgs, RenderArgs srcArgs,
             Rectangle[] rois, int startIndex, int length)
         {
-            Dictionary<byte, ColorBgra> histogramDictionary;
+            List<KeyValuePair<byte, ColorBgra>> histogramDictionary;
 
             if (paletteText == null)
             {
@@ -50,11 +51,11 @@ namespace PdnColorize
 
             try
             {
-                histogramDictionary = JsonConvert.DeserializeObject<Dictionary<byte, ColorBgra>>(paletteText);
+                histogramDictionary = JsonConvert.DeserializeObject<List<KeyValuePair<byte, ColorBgra>>>(paletteText);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                Decline("Clipboard contains text, but does not contain palette info!");
+                Decline("Clipboard contains text, but does not contain palette info! Error: " + e.Message);
                 return;
             }
 
@@ -68,8 +69,15 @@ namespace PdnColorize
                     {
                         var colorHere = srcArgs.Surface.GetPoint(x, y);
 
-                        dstArgs.Surface.SetPoint(x, y, gradient.GetPoint(colorHere.R));
-                            // R will be fine because it's greyscale, all are the same anyway
+                        var grad = gradient.GetPoint(colorHere.R);
+
+                        dstArgs.Surface.SetPoint(x, y, grad);
+
+//                            var dstPtr = dstArgs.Surface.GetPointAddressUnchecked(x, y);
+//                            dstPtr->R = grad.R;
+//                            dstPtr->G = grad.G;
+//                            dstPtr->B = grad.B;
+                        // R will be fine because it's greyscale, all are the same anyway
                     }
             }
         }
@@ -86,9 +94,12 @@ namespace PdnColorize
     {
         private readonly Dictionary<byte, ColorBgra> _map;
 
-        public Gradient(IReadOnlyDictionary<byte, ColorBgra> histogramDictionary)
+        public Gradient(IEnumerable<KeyValuePair<byte, ColorBgra>> temp)
         {
             _map = new Dictionary<byte, ColorBgra>();
+
+            var histogramDictionary = temp.ToDictionary(keyValuePair => keyValuePair.Key,
+                keyValuePair => keyValuePair.Value);
 
             for (var i = 0; i < 256; i++)
             {
@@ -106,7 +117,18 @@ namespace PdnColorize
                     if (histogramDictionary.ContainsKey((byte) higher))
                         break;
 
-                var percent = (i - (float) lower)/(higher - (float) lower);
+                if (!histogramDictionary.ContainsKey((byte) lower))
+                    lower = histogramDictionary.First().Key;
+                if (!histogramDictionary.ContainsKey((byte) higher))
+                    higher = histogramDictionary.Last().Key;
+
+                var f = i;
+                if (f > higher)
+                    f = higher;
+                if (f < lower)
+                    f = lower;
+
+                var percent = (f - (float) lower)/(higher - (float) lower);
                 var ca = histogramDictionary[(byte) lower];
                 var cb = histogramDictionary[(byte) higher];
 

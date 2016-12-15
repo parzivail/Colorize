@@ -33,7 +33,7 @@ namespace PdnColorize
                     {
                         var colorHere = srcArgs.Surface.GetPoint(x, y);
 
-                        var mapped = (byte)((colorHere.R + colorHere.G + colorHere.B)/3f);
+                        var mapped = (byte)(colorHere.ToColor().GetBrightness() * 255);
                         if (!histogramDictionary.ContainsKey(mapped))
                             histogramDictionary.Add(mapped, colorHere);
                     }
@@ -41,18 +41,14 @@ namespace PdnColorize
 
             var sorted = from entry in histogramDictionary orderby entry.Key ascending select entry;
 
-            lock (ColorizeEffect.sync)
+            var thread = new Thread(() =>
             {
                 Clipboard.SetText(JsonConvert.SerializeObject(sorted));
                 MessageBox.Show("Copied palette data to clipboard!", StaticName, MessageBoxButtons.OK);
-            }
-
-//            var thread = new Thread(() => {
-//                Clipboard.SetText(JsonConvert.SerializeObject(sorted));
-//                MessageBox.Show("Copied palette data to clipboard!", StaticName, MessageBoxButtons.OK);
-//            });
-//            thread.SetApartmentState(ApartmentState.STA);
-//            thread.Start();
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
         }
     }
 }
