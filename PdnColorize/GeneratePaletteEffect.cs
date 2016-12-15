@@ -41,9 +41,18 @@ namespace PdnColorize
 
             var sorted = from entry in histogramDictionary orderby entry.Key ascending select entry;
 
-            Clipboard.SetText(JsonConvert.SerializeObject(sorted));
-            
-            ThreadsafeMessageBox.Show(StaticName, "Copied palette data to clipboard!");
+            lock (ColorizeEffect.sync)
+            {
+                Clipboard.SetText(JsonConvert.SerializeObject(sorted));
+                MessageBox.Show("Copied palette data to clipboard!", StaticName, MessageBoxButtons.OK);
+            }
+
+//            var thread = new Thread(() => {
+//                Clipboard.SetText(JsonConvert.SerializeObject(sorted));
+//                MessageBox.Show("Copied palette data to clipboard!", StaticName, MessageBoxButtons.OK);
+//            });
+//            thread.SetApartmentState(ApartmentState.STA);
+//            thread.Start();
         }
     }
 }
